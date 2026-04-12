@@ -55,21 +55,21 @@ class SnakeGameView @JvmOverloads constructor(
     }
     private var gameUiListener: ((score: Int, bestScore: Int, state: GameState) -> Unit)? = null
 
-    private val backgroundPaint = Paint().apply { color = Color.parseColor("#101820") }
+    private val backgroundPaint = Paint().apply { color = Color.parseColor("#09131E") }
     private val gridPaint = Paint().apply {
-        color = Color.parseColor("#22313D")
+        color = Color.parseColor("#1B3550")
         strokeWidth = 1f
     }
-    private val snakePaint = Paint().apply { color = Color.parseColor("#4ED07A") }
-    private val snakeHeadPaint = Paint().apply { color = Color.parseColor("#7BF2A3") }
+    private val snakePaint = Paint().apply { color = Color.parseColor("#37C978") }
+    private val snakeHeadPaint = Paint().apply { color = Color.parseColor("#58F3A1") }
     private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-    private val foodPaint = Paint().apply { color = Color.parseColor("#FF6B6B") }
+    private val foodPaint = Paint().apply { color = Color.parseColor("#FF7B8D") }
     private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 42f
     }
     private val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#AA0B1118")
+        color = Color.parseColor("#B2081119")
     }
 
     private val gameTick = object : Runnable {
@@ -221,15 +221,15 @@ class SnakeGameView @JvmOverloads constructor(
             val centerX = width / 2f
             val centerY = height / 2f
             val title = when (state) {
-                GameState.NOT_STARTED -> "Ready to slither?"
+                GameState.NOT_STARTED -> "Neon Snake"
                 GameState.PAUSED -> "Paused"
                 GameState.GAME_OVER -> "Game Over"
                 else -> ""
             }
             val subtitle = when (state) {
-                GameState.NOT_STARTED -> "Tap Start Game"
+                GameState.NOT_STARTED -> "Hit Start to begin"
                 GameState.PAUSED -> "Tap Resume to continue"
-                GameState.GAME_OVER -> "Tap Restart Game"
+                GameState.GAME_OVER -> "Try again with Restart"
                 else -> ""
             }
             if (title.isNotBlank()) {
