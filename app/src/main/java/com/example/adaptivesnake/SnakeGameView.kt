@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Point
+import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -20,9 +21,17 @@ class SnakeGameView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
+    enum class GameState {
+        NOT_STARTED,
+        RUNNING,
+        PAUSED,
+        GAME_OVER
+    }
+
     private val frameHandler = Handler(Looper.getMainLooper())
     private var tickRateMs = 140L
     private var running = false
+    private var state = GameState.NOT_STARTED
 
     private var boardCols = 20
     private var boardRows = 30
@@ -34,17 +43,33 @@ class SnakeGameView @JvmOverloads constructor(
     private var food = Point(8, 8)
 
     private var score = 0
+    private var bestScore = 0
     private var gameOver = false
 
     private var touchStartX = 0f
     private var touchStartY = 0f
+    private var isInitialized = false
+
+    private val prefs by lazy {
+        context.getSharedPreferences("snake_prefs", Context.MODE_PRIVATE)
+    }
+    private var gameUiListener: ((score: Int, bestScore: Int, state: GameState) -> Unit)? = null
 
     private val backgroundPaint = Paint().apply { color = Color.parseColor("#101820") }
+    private val gridPaint = Paint().apply {
+        color = Color.parseColor("#22313D")
+        strokeWidth = 1f
+    }
     private val snakePaint = Paint().apply { color = Color.parseColor("#4ED07A") }
+    private val snakeHeadPaint = Paint().apply { color = Color.parseColor("#7BF2A3") }
+    private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private val foodPaint = Paint().apply { color = Color.parseColor("#FF6B6B") }
     private val hudPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 42f
+    }
+    private val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#AA0B1118")
     }
 
     private val gameTick = object : Runnable {
@@ -59,18 +84,60 @@ class SnakeGameView @JvmOverloads constructor(
     init {
         isFocusable = true
         isClickable = true
+        bestScore = prefs.getInt("best_score", 0)
         resetGame()
+        updateUi()
     }
 
     fun resume() {
-        if (running) return
+        if (state == GameState.PAUSED) {
+            running = true
+            state = GameState.RUNNING
+        }
+        if (state != GameState.RUNNING || running) return
         running = true
         frameHandler.post(gameTick)
+        updateUi()
     }
 
     fun pause() {
+        if (state == GameState.RUNNING) {
+            state = GameState.PAUSED
+        }
         running = false
         frameHandler.removeCallbacks(gameTick)
+        updateUi()
+    }
+
+    fun startNewGame() {
+        if (!isInitialized) return
+        resetGame()
+        state = GameState.RUNNING
+        if (!running) {
+            running = true
+            frameHandler.post(gameTick)
+        }
+        updateUi()
+    }
+
+    fun togglePause() {
+        when (state) {
+            GameState.RUNNING -> pause()
+            GameState.PAUSED -> {
+                state = GameState.RUNNING
+                if (!running) {
+                    running = true
+                    frameHandler.post(gameTick)
+                }
+                updateUi()
+            }
+            else -> Unit
+        }
+    }
+
+    fun setGameUiListener(listener: (score: Int, bestScore: Int, state: GameState) -> Unit) {
+        gameUiListener = listener
+        updateUi()
     }
 
     private fun resetGame() {
@@ -86,6 +153,7 @@ class SnakeGameView @JvmOverloads constructor(
         tickRateMs = 140L
         gameOver = false
         spawnFood()
+        updateUi()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -98,6 +166,11 @@ class SnakeGameView @JvmOverloads constructor(
 
         hudPaint.textSize = max(18f * resources.displayMetrics.scaledDensity, min(w, h) / 20f)
         resetGame()
+        state = GameState.NOT_STARTED
+        running = false
+        frameHandler.removeCallbacks(gameTick)
+        isInitialized = true
+        updateUi()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -107,9 +180,20 @@ class SnakeGameView @JvmOverloads constructor(
         val offsetX = (width - boardCols * cellSizePx) / 2f
         val offsetY = (height - boardRows * cellSizePx) / 2f
 
+        for (col in 0..boardCols) {
+            val x = offsetX + col * cellSizePx
+            canvas.drawLine(x, offsetY, x, offsetY + boardRows * cellSizePx, gridPaint)
+        }
+        for (row in 0..boardRows) {
+            val y = offsetY + row * cellSizePx
+            canvas.drawLine(offsetX, y, offsetX + boardCols * cellSizePx, y, gridPaint)
+        }
+
+        val snakeHead = snake.firstOrNull()
         for (segment in snake) {
             val left = offsetX + segment.x * cellSizePx
             val top = offsetY + segment.y * cellSizePx
+            val paint = if (segment == snakeHead) snakeHeadPaint else snakePaint
             canvas.drawRoundRect(
                 left + 2,
                 top + 2,
@@ -117,35 +201,48 @@ class SnakeGameView @JvmOverloads constructor(
                 top + cellSizePx - 2,
                 cellSizePx * 0.2f,
                 cellSizePx * 0.2f,
-                snakePaint
+                paint
             )
         }
+        drawSnakeEyes(canvas, snakeHead, offsetX, offsetY)
 
         val foodLeft = offsetX + food.x * cellSizePx
         val foodTop = offsetY + food.y * cellSizePx
-        canvas.drawCircle(
-            foodLeft + cellSizePx / 2f,
-            foodTop + cellSizePx / 2f,
-            cellSizePx * 0.36f,
-            foodPaint
+        val foodRect = RectF(
+            foodLeft + cellSizePx * 0.18f,
+            foodTop + cellSizePx * 0.18f,
+            foodLeft + cellSizePx * 0.82f,
+            foodTop + cellSizePx * 0.82f
         )
+        canvas.drawOval(foodRect, foodPaint)
 
-        canvas.drawText("Score: $score", offsetX, offsetY - 12f, hudPaint)
-
-        if (gameOver) {
+        if (state == GameState.NOT_STARTED || state == GameState.PAUSED || gameOver) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
             val centerX = width / 2f
             val centerY = height / 2f
-            val gameOverText = "Game Over"
-            val restartText = "Tap to restart"
-            val gameOverWidth = hudPaint.measureText(gameOverText)
-            val restartWidth = hudPaint.measureText(restartText)
-            canvas.drawText(gameOverText, centerX - gameOverWidth / 2f, centerY, hudPaint)
-            canvas.drawText(
-                restartText,
-                centerX - restartWidth / 2f,
-                centerY + hudPaint.textSize * 1.5f,
-                hudPaint
-            )
+            val title = when (state) {
+                GameState.NOT_STARTED -> "Ready to slither?"
+                GameState.PAUSED -> "Paused"
+                GameState.GAME_OVER -> "Game Over"
+                else -> ""
+            }
+            val subtitle = when (state) {
+                GameState.NOT_STARTED -> "Tap Start Game"
+                GameState.PAUSED -> "Tap Resume to continue"
+                GameState.GAME_OVER -> "Tap Restart Game"
+                else -> ""
+            }
+            if (title.isNotBlank()) {
+                val titleWidth = hudPaint.measureText(title)
+                val subtitleWidth = hudPaint.measureText(subtitle)
+                canvas.drawText(title, centerX - titleWidth / 2f, centerY, hudPaint)
+                canvas.drawText(
+                    subtitle,
+                    centerX - subtitleWidth / 2f,
+                    centerY + hudPaint.textSize * 1.5f,
+                    hudPaint
+                )
+            }
         }
     }
 
@@ -155,7 +252,7 @@ class SnakeGameView @JvmOverloads constructor(
                 touchStartX = event.x
                 touchStartY = event.y
                 if (gameOver) {
-                    resetGame()
+                    startNewGame()
                     return true
                 }
             }
@@ -188,6 +285,10 @@ class SnakeGameView @JvmOverloads constructor(
 
         if (next.x !in 0 until boardCols || next.y !in 0 until boardRows || snake.any { it == next }) {
             gameOver = true
+            running = false
+            frameHandler.removeCallbacks(gameTick)
+            state = GameState.GAME_OVER
+            updateUi()
             return
         }
 
@@ -195,8 +296,13 @@ class SnakeGameView @JvmOverloads constructor(
 
         if (next == food) {
             score += 10
+            if (score > bestScore) {
+                bestScore = score
+                prefs.edit().putInt("best_score", bestScore).apply()
+            }
             tickRateMs = max(70L, tickRateMs - 3)
             spawnFood()
+            updateUi()
         } else {
             snake.removeLast()
         }
@@ -210,6 +316,38 @@ class SnakeGameView @JvmOverloads constructor(
                 return
             }
         }
+    }
+
+    private fun drawSnakeEyes(canvas: Canvas, head: Point?, offsetX: Float, offsetY: Float) {
+        if (head == null) return
+        val left = offsetX + head.x * cellSizePx
+        val top = offsetY + head.y * cellSizePx
+        val eyeRadius = cellSizePx * 0.07f
+        val horizontalEyeY = top + cellSizePx * 0.3f
+        val verticalLeftEyeX = left + cellSizePx * 0.3f
+        val verticalRightEyeX = left + cellSizePx * 0.7f
+
+        when (direction) {
+            Direction.UP, Direction.DOWN -> {
+                canvas.drawCircle(verticalLeftEyeX, horizontalEyeY, eyeRadius, eyePaint)
+                canvas.drawCircle(verticalRightEyeX, horizontalEyeY, eyeRadius, eyePaint)
+            }
+
+            Direction.LEFT -> {
+                canvas.drawCircle(left + cellSizePx * 0.3f, top + cellSizePx * 0.35f, eyeRadius, eyePaint)
+                canvas.drawCircle(left + cellSizePx * 0.3f, top + cellSizePx * 0.65f, eyeRadius, eyePaint)
+            }
+
+            Direction.RIGHT -> {
+                canvas.drawCircle(left + cellSizePx * 0.7f, top + cellSizePx * 0.35f, eyeRadius, eyePaint)
+                canvas.drawCircle(left + cellSizePx * 0.7f, top + cellSizePx * 0.65f, eyeRadius, eyePaint)
+            }
+        }
+    }
+
+    private fun updateUi() {
+        gameUiListener?.invoke(score, bestScore, state)
+        invalidate()
     }
 
     private enum class Direction(val dx: Int, val dy: Int) {
