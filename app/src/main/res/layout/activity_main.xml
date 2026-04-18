@@ -2,8 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/snake_background"
-    android:padding="12dp">
+    android:background="@color/snake_background">
 
     <com.example.adaptivesnake.SnakeGameView
         android:id="@+id/snakeGameView"
@@ -15,28 +14,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="@drawable/panel_surface"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="14dp">
+        android:padding="16dp">
 
         <TextView
             android:id="@+id/scoreText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="@color/hud_text"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:textColor="@android:color/white"
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/bestScoreText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/hud_text_secondary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textColor="@android:color/white"
+            android:textSize="18sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -44,35 +39,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/panel_surface"
         android:gravity="center"
         android:orientation="horizontal"
-        android:padding="10dp">
+        android:padding="16dp">
 
         <Button
             android:id="@+id/startButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:background="@drawable/button_primary"
-            android:text="@string/start_game"
-            android:textAllCaps="false"
-            android:textColor="@color/button_primary_text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:text="@string/start_game" />
 
         <Button
             android:id="@+id/pauseButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/button_secondary"
-            android:text="@string/pause_game"
-            android:textAllCaps="false"
-            android:textColor="@color/button_secondary_text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:text="@string/pause_game" />
     </LinearLayout>
 
 </FrameLayout>
